@@ -1,3 +1,5 @@
 .claude/settings.local.json
 .playwright-mcp/
 .DS_Store
+logs/
+visit-reports/

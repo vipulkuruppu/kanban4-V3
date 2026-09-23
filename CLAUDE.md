@@ -26,6 +26,14 @@ Open `index.html` in a browser, or serve the directory (for example `python3 -m 
 
 `FORMSUBMIT_ENDPOINT` near the top of the script is the only place the recipient address is set. On submit, the card is added to the board immediately, and then `notifyNewTask()` POSTs JSON to FormSubmit. If that fails, the user sees a warning toast and the board is unaffected. FormSubmit can return HTTP 200 with `success: "false"`, and that case is treated as a failure. A new address needs a one-time activation: the first submission sends a confirmation email instead of delivering.
 
+## WhatsApp support widget
+
+A floating button in the bottom-right corner (`#open-whatsapp`) opens the `#whatsapp` dialog, which lists `WHATSAPP_QUERIES`. Each query is a `https://wa.me/<WHATSAPP_NUMBER>?text=…` link that opens in a new tab. The dialog works like the other modals: it traps focus, closes on Escape, and returns focus to the button. The toast region sits above the button so the two don't overlap.
+
+## Visit tracking
+
+`startVisitTracking()` sends same-origin `navigator.sendBeacon` posts to `VISIT_ENDPOINT` (`/__visit`) with a random visit id and the time the tab was visible. It does nothing on `*.github.io` or `file://`. Only `python3 tools/visit_server.py` handles those posts. It serves the site, appends to `logs/visits.jsonl` (source IP, user agent, duration) and returns 404 for `logs/`, `tools/`, `.claude/` and the report folders. `python3 tools/visit_report.py` builds the escaped HTML report in `visit-reports/`, and the `visit-monitor` agent runs it. The logs and reports are gitignored because IPs are personal data.
+
 ## Conventions
 
 - Accessibility is deliberate throughout. Keep it intact when changing the UI: ARIA labels on icon buttons, `aria-invalid` with per-field `err-<name>` messages, the modal focus trap and Escape handling, the `aria-live` toast region, and keyboard move and delete as an alternative to drag and drop.

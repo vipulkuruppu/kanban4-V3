@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!--
   Security headers (delivered as meta tags because GitHub Pages cannot set HTTP headers).
-  The CSP limits outbound requests to FormSubmit (connect-src) and Google Fonts, blocks
+  The CSP limits outbound requests to FormSubmit and the same-origin visit beacon
+  (connect-src) and Google Fonts, blocks
   plugins, <base> hijacking and native form posts. Scripts stay inline (single-file app),
   so script-src needs 'unsafe-inline'; escapeHtml() remains the primary XSS control.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://formsubmit.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://formsubmit.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -56,6 +57,10 @@
   --proj-6: #3aa56a;
 
   --focus: #ffb000;
+
+  /* WhatsApp brand teal: white on it passes 4.5:1 */
+  --whatsapp: #128c7e;
+  --whatsapp-dark: #075e54;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -517,7 +522,8 @@ main { padding: var(--space-5) var(--space-5) var(--space-6); }
 .toasts {
   position: fixed;
   right: var(--space-4);
-  bottom: var(--space-4);
+  /* sit above the floating WhatsApp button */
+  bottom: calc(var(--space-4) + 3.5rem + var(--space-3));
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -535,6 +541,57 @@ main { padding: var(--space-5) var(--space-5) var(--space-6); }
 .toast-success { --tone: var(--pine-700); color: var(--pine-800); }
 .toast-warning { --tone: var(--red-700);  color: var(--red-800); background: var(--red-100); }
 .toast-info    { --tone: var(--pine-500); color: var(--ink); }
+
+/* =========================================================
+   9b. WhatsApp support widget
+   ========================================================= */
+.wa-fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 40;
+  width: 3.5rem;
+  height: 3.5rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--whatsapp);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.wa-fab:hover { background: var(--whatsapp-dark); transform: scale(1.06); }
+.wa-fab svg { width: 1.9rem; height: 1.9rem; }
+.wa-backdrop {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-4) + 3.5rem + var(--space-3));
+}
+.wa-panel { max-width: 24rem; overflow: hidden; }
+.wa-panel .modal-head { background: var(--whatsapp-dark); border-bottom: 0; }
+.wa-panel .modal-head h2 { color: #fff; display: flex; align-items: center; gap: var(--space-2); }
+.wa-panel .modal-head h2 svg { width: 1.3rem; height: 1.3rem; }
+.wa-panel .modal-head .icon-btn { color: #fff; background: transparent; border-color: transparent; }
+.wa-panel .modal-head .icon-btn:hover { background: var(--whatsapp); color: #fff; }
+.wa-intro { margin: 0 0 var(--space-3); font-size: 0.9rem; color: var(--ink-soft); }
+.wa-queries { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.wa-query {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--pine-50);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.modal-body a.wa-query { color: var(--ink); font-weight: 600; }
+.wa-query:hover { background: var(--pine-100); border-color: var(--pine-300); }
+.wa-note { margin: var(--space-3) 0 0; font-size: 0.75rem; color: var(--ink-mute); }
 
 /* =========================================================
    10. Responsive + motion
@@ -780,6 +837,26 @@ main { padding: var(--space-5) var(--space-5) var(--space-6); }
 <!-- Toast region (announced politely to screen readers) -->
 <div class="toasts" id="toasts" aria-live="polite" role="status"></div>
 
+<!-- =========================================================
+     WhatsApp IT support widget: floating button + suggested queries
+     ========================================================= -->
+<button type="button" class="wa-fab" id="open-whatsapp" aria-haspopup="dialog" aria-expanded="false" aria-controls="whatsapp" aria-label="Chat with IT support on WhatsApp">
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l4.8-1.3A9.5 9.5 0 1 0 12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.6 7.4c.3-.5.9-.5 1.2 0l.8 1.7c.2.4.1.8-.2 1.1l-.6.6c.6 1.3 1.6 2.3 2.9 2.9l.6-.6c.3-.3.7-.4 1.1-.2l1.7.8c.5.3.5.9 0 1.2-.8.6-1.8.9-2.7.6-2.6-.9-4.6-2.9-5.5-5.5-.3-.9 0-1.9.7-2.6z" fill="currentColor"/></svg>
+</button>
+<div class="modal-backdrop wa-backdrop" id="whatsapp" hidden>
+  <div class="modal wa-panel" role="dialog" aria-modal="true" aria-labelledby="whatsapp-title" aria-describedby="whatsapp-intro">
+    <div class="modal-head">
+      <h2 id="whatsapp-title"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5a9.5 9.5 0 0 0-8.2 14.3L2.5 21.5l4.8-1.3A9.5 9.5 0 1 0 12 2.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.6 7.4c.3-.5.9-.5 1.2 0l.8 1.7c.2.4.1.8-.2 1.1l-.6.6c.6 1.3 1.6 2.3 2.9 2.9l.6-.6c.3-.3.7-.4 1.1-.2l1.7.8c.5.3.5.9 0 1.2-.8.6-1.8.9-2.7.6-2.6-.9-4.6-2.9-5.5-5.5-.3-.9 0-1.9.7-2.6z" fill="currentColor"/></svg> IT Support</h2>
+      <button type="button" class="icon-btn delete-btn" id="close-whatsapp" aria-label="Close WhatsApp support">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="wa-intro" id="whatsapp-intro">Hi! How can we help? Pick a question to start a WhatsApp chat with IT support.</p>
+      <ul class="wa-queries" id="whatsapp-queries"></ul>
+      <p class="wa-note">Opens WhatsApp in a new tab. Don't share passwords or one-time codes in chat.</p>
+    </div>
+  </div>
+</div>
+
 <!--
   FormSubmit setup: FormSubmit needs a ONE-TIME ACTIVATION.
   The first submission to a new address does not deliver. FormSubmit sends a
@@ -794,6 +871,10 @@ main { padding: var(--space-5) var(--space-5) var(--space-6); }
    CONFIG: change the email address here (the only place)
    ========================================================= */
 const FORMSUBMIT_ENDPOINT = "https://formsubmit.co/ajax/YOUR_EMAIL@example.com";
+// Same-origin beacon handled by tools/visit_server.py. Skipped on GitHub Pages and file://.
+const VISIT_ENDPOINT = "/__visit";
+// WhatsApp IT support number, international format without "+" (65 = Singapore).
+const WHATSAPP_NUMBER = "6512345678";
 
 /* =========================================================
    Constants
@@ -804,6 +885,17 @@ const CATEGORIES = ["Application Development", "Infrastructure", "Cybersecurity"
 const PRIORITIES = ["Critical", "High", "Medium", "Low"];
 const TOAST_MS   = 4500;
 const WELCOME_DELAY_MS = 10000;
+// Suggested questions shown when the WhatsApp button is clicked.
+const WHATSAPP_QUERIES = [
+  "I forgot my password / my account is locked",
+  "I can't connect to the VPN",
+  "Outlook or email isn't working",
+  "I need software installed on my laptop",
+  "I need access to a shared drive or application",
+  "My laptop is slow or not starting",
+  "I want to report a suspicious email",
+  "I have a question about a project on this board",
+];
 
 // Donut charts: which values each one breaks down, and their color tokens.
 const CHARTS = {
@@ -1250,7 +1342,7 @@ let welcomeReturnFocus = null;
 
 function openWelcome() {
   // Don't interrupt someone filling in the Add Task form; retry when it closes.
-  if (!modal.hidden) { setTimeout(openWelcome, 1000); return; }
+  if (!modal.hidden || !whatsapp.hidden) { setTimeout(openWelcome, 1000); return; }
   welcomeReturnFocus = document.activeElement;
   welcome.hidden = false;
   document.getElementById("ok-welcome").focus();
@@ -1265,6 +1357,52 @@ function trapWelcomeFocus(event) {
   if (event.key === "Escape") { closeWelcome(); return; }
   if (event.key !== "Tab") return;
   const focusables = welcome.querySelectorAll("button, a[href]");
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+
+/* =========================================================
+   WhatsApp support: clicking the floating button opens a dialog
+   of suggested queries; each one opens a pre-filled wa.me chat
+   ========================================================= */
+const whatsapp = document.getElementById("whatsapp");
+const whatsappBtn = document.getElementById("open-whatsapp");
+
+function whatsappLink(text) {
+  const base = `https://wa.me/${WHATSAPP_NUMBER}`;
+  return text ? `${base}?text=${encodeURIComponent(text)}` : base;
+}
+
+function renderWhatsappQueries() {
+  const items = WHATSAPP_QUERIES.map((q) => `
+    <li><a class="wa-query" href="${escapeHtml(whatsappLink(`Hi IT Support, ${q}.`))}" target="_blank" rel="noopener noreferrer">${escapeHtml(q)}</a></li>`);
+  items.push(`
+    <li><a class="wa-query" href="${escapeHtml(whatsappLink(""))}" target="_blank" rel="noopener noreferrer">Something else: start a chat</a></li>`);
+  document.getElementById("whatsapp-queries").innerHTML = items.join("");
+}
+
+function openWhatsapp() {
+  whatsapp.hidden = false;
+  whatsappBtn.setAttribute("aria-expanded", "true");
+  whatsapp.querySelector(".wa-query").focus();
+}
+
+function closeWhatsapp() {
+  whatsapp.hidden = true;
+  whatsappBtn.setAttribute("aria-expanded", "false");
+  whatsappBtn.focus();
+}
+
+function handleWhatsappClick() {
+  if (whatsapp.hidden) openWhatsapp(); else closeWhatsapp();
+}
+
+function trapWhatsappFocus(event) {
+  if (event.key === "Escape") { closeWhatsapp(); return; }
+  if (event.key !== "Tab") return;
+  const focusables = whatsapp.querySelectorAll("button, a[href]");
   const first = focusables[0];
   const last = focusables[focusables.length - 1];
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
@@ -1415,6 +1553,45 @@ function handleChartClick(event) {
 }
 
 /* =========================================================
+   Visit tracking (time on site, visible tab only)
+   ========================================================= */
+function startVisitTracking() {
+  const { protocol, hostname } = window.location;
+  if (!protocol.startsWith("http") || hostname.endsWith("github.io") || !navigator.sendBeacon) return;
+
+  // randomUUID needs a secure context; plain http on a LAN host falls back to random bytes.
+  const visitId = crypto.randomUUID
+    ? crypto.randomUUID()
+    : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  let visibleMs = 0;
+  let visibleSince = document.visibilityState === "visible" ? performance.now() : null;
+  let ended = false;
+
+  const elapsed = () => visibleMs + (visibleSince === null ? 0 : performance.now() - visibleSince);
+  const send = (event) => {
+    const body = JSON.stringify({ visitId, event, durationMs: Math.round(elapsed()), path: location.pathname });
+    navigator.sendBeacon(VISIT_ENDPOINT, new Blob([body], { type: "text/plain" }));
+  };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      if (visibleSince !== null) visibleMs += performance.now() - visibleSince;
+      visibleSince = null;
+      // Mobile browsers may never fire pagehide, so report on every hide.
+      if (!ended) send("hidden");
+    } else {
+      visibleSince = performance.now();
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    if (ended) return;
+    ended = true;
+    send("end");
+  });
+  send("start");
+}
+
+/* =========================================================
    Init
    ========================================================= */
 function init() {
@@ -1451,7 +1628,14 @@ function init() {
   welcome.addEventListener("click", (e) => { if (e.target === welcome) closeWelcome(); });
   setTimeout(openWelcome, WELCOME_DELAY_MS);
 
+  renderWhatsappQueries();
+  whatsappBtn.addEventListener("click", handleWhatsappClick);
+  document.getElementById("close-whatsapp").addEventListener("click", closeWhatsapp);
+  whatsapp.addEventListener("keydown", trapWhatsappFocus);
+  whatsapp.addEventListener("click", (e) => { if (e.target === whatsapp) closeWhatsapp(); });
+
   renderBoard();
+  startVisitTracking();
 }
 
 init();

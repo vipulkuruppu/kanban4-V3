@@ -1,0 +1,347 @@
+{
+  "report_version": "1.0",
+  "tool": "security-scanner (Claude Code agent)",
+  "project": "UOB IT PMO — Project Board",
+  "commit": "a4b84ff7d4fd06023f55b85ea9f33c836eac7fd7",
+  "scan_started_at": "2026-09-23T07:43:26Z",
+  "scan_completed_at": "2026-09-23T07:44:17Z",
+  "scan_local_time": "2026-09-23T15:43:26+0800",
+  "files_scanned": [
+    "index.html",
+    "README.md",
+    "CLAUDE.md",
+    ".github/workflows/pages.yml",
+    ".mcp.json",
+    ".gitignore",
+    "skills-lock.json",
+    ".claude/commands/publish.md",
+    ".claude/agents/security-scanner.md"
+  ],
+  "summary": {
+    "total": 12,
+    "critical": 0,
+    "high": 0,
+    "medium": 2,
+    "low": 7,
+    "info": 3,
+    "critical_flag": false,
+    "verdict": "PASS_WITH_WARNINGS"
+  },
+  "critical_issues": [],
+  "findings": [
+    {
+      "id": "SEC-001",
+      "title": "CSP allows 'unsafe-inline' in script-src",
+      "severity": "Medium",
+      "critical": false,
+      "cvss_estimate": 4.2,
+      "cwe": "CWE-693",
+      "owasp": "A05:2021-Security Misconfiguration",
+      "category": "csp",
+      "file": "index.html",
+      "line": 12,
+      "evidence": "script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; ...",
+      "description": "The CSP permits any inline <script> and inline event handler, so it gives no protection if an XSS sink is ever introduced. escapeHtml() is the only XSS control. The policy otherwise restricts well: default-src 'none', no unsafe-eval, and no wildcard hosts.",
+      "exploit_scenario": "If a future change places an unescaped user field in innerHTML, a payload such as <img src=x onerror=...> runs because inline handlers are allowed. The CSP would not block it.",
+      "recommendation": "Move the script into a separate same-origin file (for example app.js) and use script-src 'self'. Alternatively, add a sha256 hash of the inline script block to script-src and drop 'unsafe-inline' (the hash must be regenerated on each script change). Keep escapeHtml() on every interpolated value.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-002",
+      "title": "FormSubmit endpoint can be scripted to spam the recipient (captcha disabled, no honeypot, no rate limit)",
+      "severity": "Medium",
+      "critical": false,
+      "cvss_estimate": 5.3,
+      "cwe": "CWE-799",
+      "owasp": "A04:2021-Insecure Design",
+      "category": "third-party",
+      "file": "index.html",
+      "line": 1115,
+      "evidence": "_captcha: \"false\",",
+      "description": "notifyNewTask() explicitly disables the FormSubmit captcha, sends no _honey honeypot field and has no client-side throttle. The endpoint URL is public in the page source, so anyone can POST arbitrary JSON to it directly, bypassing the page entirely. Each POST produces an email to the configured recipient.",
+      "exploit_scenario": "An attacker copies FORMSUBMIT_ENDPOINT from view-source and runs a loop: for i in $(seq 1000); do curl -s -X POST -H 'Content-Type: application/json' -d '{\"_subject\":\"spam\",\"Title\":\"x\"}' <endpoint>; done. The recipient's inbox is flooded, and FormSubmit may throttle or block the address.",
+      "recommendation": "Use a FormSubmit random-string alias instead of the email. Add a hidden _honey field (and reject submissions where it is filled). Add a simple client-side cooldown (for example one submission per 30 s via a timestamp in state). Consider restricting accepted origins in FormSubmit settings. Note that client-side controls only deter casual abuse; the public endpoint remains scriptable.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-003",
+      "title": "Development MCP config uses unpinned @latest package and discloses local user path",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 2.5,
+      "cwe": "CWE-1104",
+      "owasp": "A06:2021-Vulnerable and Outdated Components",
+      "category": "config",
+      "file": ".mcp.json",
+      "line": 7,
+      "evidence": "\"command\": \"/Users/vipul/.nvm/versions/node/v24.21.0/bin/npx\",\n\"args\": [\"@playwright/mcp@latest\"]",
+      "description": ".mcp.json is tracked and published to the GitHub repo. It runs @playwright/mcp@latest via npx, so any compromised or malicious future release is executed automatically on the developer's machine. It also discloses the local username and filesystem layout. It is not deployed to Pages (the workflow copies only index.html).",
+      "exploit_scenario": "A compromised npm release of @playwright/mcp is fetched and executed the next time Claude Code starts the MCP server on a developer machine.",
+      "recommendation": "Pin an exact version (for example @playwright/mcp@0.0.x) and update it deliberately. Use a plain \"npx\" command rather than an absolute home-directory path, or move the file to an untracked local config.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-004",
+      "title": "Google Fonts stylesheet loaded without SRI; style-src allows 'unsafe-inline'",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 3.1,
+      "cwe": "CWE-829",
+      "owasp": "A08:2021-Software and Data Integrity Failures",
+      "category": "third-party",
+      "file": "index.html",
+      "line": 16,
+      "evidence": "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Public+Sans:...\">",
+      "description": "The external stylesheet has no integrity attribute, and style-src also permits inline styles. SRI is impractical for Google Fonts because the CSS is generated per user agent, but a compromised or hijacked fonts.googleapis.com response could inject CSS (UI redress, attribute-selector data exfiltration is limited here because img-src/connect-src are restricted).",
+      "exploit_scenario": "A malicious CSS response hides or overlays UI elements to mislead users, for example relabelling the delete confirmation.",
+      "recommendation": "Self-host the Public Sans font files and CSS alongside index.html, then remove fonts.googleapis.com/fonts.gstatic.com from the CSP and use style-src 'self' (moving the <style> block into a file or hashing it).",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-005",
+      "title": "GitHub Actions pinned to mutable major-version tags",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 3.0,
+      "cwe": "CWE-829",
+      "owasp": "A08:2021-Software and Data Integrity Failures",
+      "category": "config",
+      "file": ".github/workflows/pages.yml",
+      "line": 24,
+      "evidence": "- uses: actions/checkout@v4\n- uses: actions/configure-pages@v5\n- uses: actions/upload-pages-artifact@v3",
+      "description": "All actions are first-party (actions/*) and permissions are properly scoped (contents: read, pages: write, id-token: write), with no pull_request_target or untrusted input in run steps. However tags are mutable; a compromised tag could alter the deployed site.",
+      "exploit_scenario": "An attacker who compromises a tag on an action used by the workflow gets code execution with pages: write and id-token: write and can publish a modified index.html.",
+      "recommendation": "Pin each action to a full commit SHA with a version comment, for example actions/checkout@<40-char sha> # v4.x.x, and let Dependabot update them.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-006",
+      "title": "Task data (names, descriptions) sent to third-party FormSubmit in full",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 3.1,
+      "cwe": "CWE-359",
+      "owasp": "A04:2021-Insecure Design",
+      "category": "data-exposure",
+      "file": "index.html",
+      "line": 1112,
+      "evidence": "body: JSON.stringify({ _subject: `[UOB IT PMO] New task ${task.id}: ${task.title}`, ... Description: task.description, ... Assignee: task.assignee,",
+      "description": "Every new task, including free-text description and assignee name, is transmitted over HTTPS to FormSubmit, a third-party processor, and then by email. Users are not told this in the form UI. For a real PMO board this could leak internal project details or personal data to a third party. The response is parsed safely (json.message is only used in an Error; the toast is a static string) and success \"false\" is treated as failure.",
+      "exploit_scenario": "A user types confidential details (vendor names, CVE specifics, credentials in error) into the description; they are stored by FormSubmit and in email systems outside the organisation's control.",
+      "recommendation": "Add a short notice near the submit button that task details are emailed via FormSubmit. Consider sending only the task ID, title and assignee, and omitting the free-text description.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-007",
+      "title": "Assignee length not enforced in validateForm() (only via HTML maxlength)",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 2.4,
+      "cwe": "CWE-20",
+      "owasp": "A04:2021-Insecure Design",
+      "category": "validation",
+      "file": "index.html",
+      "line": 1157,
+      "evidence": "if (!v.assignee.trim()) errors.assignee = \"Assignee is required.\";",
+      "description": "Title and description lengths are checked in JS, but assignee relies solely on maxlength=\"60\" in the markup, which can be removed in devtools. An unbounded string is then rendered (escaped) on the card and sent in the FormSubmit email.",
+      "exploit_scenario": "Remove the maxlength attribute from #f-assignee in devtools and submit a 1 MB assignee string; the card layout breaks and a very large email is sent.",
+      "recommendation": "Add `else if (v.assignee.trim().length > 60) errors.assignee = \"Assignee must be 60 characters or fewer.\";` in validateForm().",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-008",
+      "title": "Due date format check accepts impossible calendar dates",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 2.0,
+      "cwe": "CWE-20",
+      "owasp": "A04:2021-Insecure Design",
+      "category": "validation",
+      "file": "index.html",
+      "line": 1161,
+      "evidence": "else if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(v.dueDate)) errors.dueDate = \"Enter a valid date.\";",
+      "description": "The regex only checks the shape, so values such as 2099-13-45 pass when the input type is changed in devtools. formatDate() then rolls the value over to a different date, and string comparisons for overdue checks become inconsistent. Not exploitable for injection (the value is escaped), but it breaks data integrity.",
+      "exploit_scenario": "Change the input type from date to text in devtools, enter 2099-99-99 and submit. The card shows a rolled-over date and the email contains the invalid value.",
+      "recommendation": "After the regex, parse the parts and confirm round-tripping: build new Date(y, m-1, d) and check toLocalISO(date) === v.dueDate.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-009",
+      "title": "FormSubmit error logged to console",
+      "severity": "Low",
+      "critical": false,
+      "cvss_estimate": 1.0,
+      "cwe": "CWE-532",
+      "owasp": "A09:2021-Security Logging and Monitoring Failures",
+      "category": "data-exposure",
+      "file": "index.html",
+      "line": 1210,
+      "evidence": "console.warn(err);",
+      "description": "The error message includes the HTTP status or FormSubmit's json.message. This is not sensitive, but it reveals the third-party integration's state (for example 'activation required') to anyone viewing the console.",
+      "exploit_scenario": "None meaningful; informational leakage only.",
+      "recommendation": "Keep as is for a demo, or log only a generic message in production.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-010",
+      "title": "frame-ancestors cannot be enforced via meta tag; no clickjacking protection on GitHub Pages",
+      "severity": "Info",
+      "critical": false,
+      "cvss_estimate": 0.0,
+      "cwe": "CWE-1021",
+      "owasp": "A05:2021-Security Misconfiguration",
+      "category": "csp",
+      "file": "index.html",
+      "line": 12,
+      "evidence": "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; ... object-src 'none'\">",
+      "description": "frame-ancestors is not in the policy and would be ignored in a <meta> tag anyway. GitHub Pages cannot send X-Frame-Options or a CSP header, so the page can be framed. Impact is low because there is no authentication or persistent state.",
+      "exploit_scenario": "A third-party site frames the board and overlays it; the only reachable actions (add/delete in-memory tasks, sending a FormSubmit email) have minimal impact.",
+      "recommendation": "Accept for a demo. If this becomes a real app, host behind a CDN or server that sets Content-Security-Policy: frame-ancestors 'none' as an HTTP header.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-011",
+      "title": "Placeholder IT support hotline number in public page",
+      "severity": "Info",
+      "critical": false,
+      "cvss_estimate": 0.0,
+      "cwe": "CWE-200",
+      "owasp": "A04:2021-Insecure Design",
+      "category": "other",
+      "file": "index.html",
+      "line": 772,
+      "evidence": "<a href=\"tel:12345678\">12345678</a>",
+      "description": "The welcome dialog advertises an 'IT support hotline' of 12345678. It is a placeholder, not real PII, but a published page under a bank brand directing users to an unverified number could be misused for support-scam social engineering if a real number with those digits exists.",
+      "exploit_scenario": "A visitor trusting the UOB branding calls 12345678 expecting IT support.",
+      "recommendation": "Replace with a clearly fictional value and a 'demo' label, or remove the number until a verified hotline is available.",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    },
+    {
+      "id": "SEC-012",
+      "title": "FORMSUBMIT_ENDPOINT exposes recipient email in page source (currently placeholder)",
+      "severity": "Info",
+      "critical": false,
+      "cvss_estimate": 0.0,
+      "cwe": "CWE-200",
+      "owasp": "A01:2021-Broken Access Control",
+      "category": "data-exposure",
+      "file": "index.html",
+      "line": 796,
+      "evidence": "const FORMSUBMIT_ENDPOINT = \"https://formsubmit.co/ajax/YOUR_EMAIL@example.com\";",
+      "description": "The committed value is a placeholder (YOUR_EMAIL@example.com), so no real address is exposed today and git history contains no real address. Once configured with a real email as README instructs, that address becomes public to anyone viewing source and a target for spam (see the FormSubmit spam finding). With the placeholder, the deployed site's notifications also never deliver.",
+      "exploit_scenario": "After configuration, view-source reveals the recipient's email, which is harvested for spam or phishing.",
+      "recommendation": "After activating FormSubmit once, replace the email with the random-string alias FormSubmit provides (https://formsubmit.co/ajax/<random-alias>).",
+      "detected_at": "2026-09-23T07:43:59Z",
+      "status": "open"
+    }
+  ],
+  "passed_checks": [
+    {
+      "check": "All user values in card HTML are escaped via escapeHtml() (title, project, assignee, category, priority, dueDate, id)",
+      "evidence": "index.html:1011-1031"
+    },
+    {
+      "check": "escapeHtml() escapes & < > \" ' and is safe for both element and quoted attribute contexts",
+      "evidence": "index.html:827-834"
+    },
+    {
+      "check": "Attribute interpolations (data-id, data-status, data-value, aria-label, datetime) are escaped",
+      "evidence": "index.html:977-978,997,1001,1009,1021"
+    },
+    {
+      "check": "Unescaped class fragment prio-${prio} comes only from whitelisted PRIORITIES values",
+      "evidence": "index.html:989,1158"
+    },
+    {
+      "check": "Chart legend and SVG titles escape values; colors come from constants only",
+      "evidence": "index.html:954-956,974-984"
+    },
+    {
+      "check": "Toasts, summary, chart scope and centre labels use textContent, not innerHTML",
+      "evidence": "index.html:1100,1035-1039,966-973"
+    },
+    {
+      "check": "Drag-and-drop payload is resolved via findTask() and status is validated against STATUSES in moveTask()",
+      "evidence": "index.html:1373-1375,1063"
+    },
+    {
+      "check": "Board button data-id is resolved via findTask() before use; move-to status validated in moveTask()",
+      "evidence": "index.html:1285-1287,1299,1063"
+    },
+    {
+      "check": "Chart filter clicks validate data-chart-filter key and data-value against CHARTS whitelist; selector uses CSS.escape()",
+      "evidence": "index.html:1407-1414"
+    },
+    {
+      "check": "validateForm() whitelists project, category, priority and status, so devtools-edited <option> values are rejected",
+      "evidence": "index.html:1155-1164"
+    },
+    {
+      "check": "Title (80) and description (500) lengths enforced in JS, not just HTML",
+      "evidence": "index.html:1152-1154"
+    },
+    {
+      "check": "No eval, new Function, document.write, insertAdjacentHTML, outerHTML or string setTimeout/setInterval",
+      "evidence": "index.html (whole file)"
+    },
+    {
+      "check": "No localStorage/sessionStorage use; no URL/hash sources read",
+      "evidence": "index.html (whole file)"
+    },
+    {
+      "check": "No javascript: URLs, no target=\"_blank\" links, no http:// mixed content",
+      "evidence": "index.html (whole file)"
+    },
+    {
+      "check": "CSP sets default-src 'none', object-src 'none', base-uri 'none', form-action 'none'; no unsafe-eval, no wildcards, no data:/blob: in script-src",
+      "evidence": "index.html:12"
+    },
+    {
+      "check": "connect-src limited to https://formsubmit.co; font-src to fonts.gstatic.com; style-src host to fonts.googleapis.com",
+      "evidence": "index.html:12"
+    },
+    {
+      "check": "Referrer policy set to no-referrer",
+      "evidence": "index.html:13"
+    },
+    {
+      "check": "No external <script> tags (SRI not needed for scripts)",
+      "evidence": "index.html"
+    },
+    {
+      "check": "FormSubmit call is HTTPS; response parsed as JSON, not rendered; success \"false\" handled as failure",
+      "evidence": "index.html:796,1128-1131"
+    },
+    {
+      "check": "Task IDs generated from a monotonically increasing counter via formatId(); no collision or injection path",
+      "evidence": "index.html:858-860,1047"
+    },
+    {
+      "check": "No regexes with catastrophic backtracking",
+      "evidence": "index.html:829-833,869,1161"
+    },
+    {
+      "check": "No secrets found (grep patterns; gitleaks not installed); matches for 'sk-' and 'token' were false positives (task-id, id-token permission)",
+      "evidence": "index.html, .github/workflows/pages.yml:11"
+    },
+    {
+      "check": "Git history contains no real email address in FORMSUBMIT_ENDPOINT",
+      "evidence": "git log -p --all"
+    },
+    {
+      "check": "GitHub Pages workflow uses least-privilege permissions, no pull_request_target, no untrusted input in run steps, and publishes only index.html",
+      "evidence": "index.html,.github/workflows/pages.yml:8-11,25-30"
+    }
+  ]
+}
